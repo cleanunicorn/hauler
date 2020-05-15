@@ -1,17 +1,17 @@
 from coinpaprika import client as Coinpaprika
+from coinpaprika.exceptions import CoinpaprikaAPIException
+import time
 import datetime
 import psycopg2
 import sys
-
-# https://api.coinpaprika.com/v1/tickers/btc-bitcoin/historical?start=2017-01-01T00:00:00Z
 
 # start
 start = datetime.datetime.strptime("2015-01-01T00:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
 # end
 end = datetime.datetime.strptime("2020-12-31T23:59:59Z", "%Y-%m-%dT%H:%M:%SZ")
 # coin
-# coin = "btc-bitcoin"
-coin = "eth-ethereum"
+coin = "btc-bitcoin"
+# coin = "eth-ethereum"
 
 # Connect to database
 try:
@@ -40,7 +40,7 @@ try:
             price numeric,
             volume_24h bigint,
             market_cap bigint,
-            CONSTRAINT "timestamp_primary_key" PRIMARY KEY ("timestamp"),
+            CONSTRAINT "%s_primary_key" PRIMARY KEY ("timestamp"),
             CONSTRAINT "timestamp_UNIQUE" UNIQUE ("timestamp")
         )
         WITH (
@@ -48,7 +48,8 @@ try:
         )
         TABLESPACE pg_default;
     """ % (
-        coin
+        coin,
+        coin,
     )
     cursor.execute(create_table_query)
     connection.commit()
@@ -72,11 +73,16 @@ while time_iterator < end:
     print("Fetching {}".format(time_format(time_iterator)))
 
     # get data
-    items = client.historical(
-        coin,
-        start=time_format(time_iterator),
-        end=time_format(time_iterator + incrementor),
-    )
+    try:
+        items = client.historical(
+            coin,
+            start=time_format(time_iterator),
+            end=time_format(time_iterator + incrementor),
+        )
+    except CoinpaprikaAPIException as e:
+        print("Hit API exception ", e)
+        time.sleep(1)
+        continue
 
     # save data
     for item in items:
